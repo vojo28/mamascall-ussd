@@ -1,17 +1,17 @@
-# Use official PHP image with CLI and built-in server
-FROM php:8.2-cli
+# Use official PHP + Apache image
+FROM php:8.2-apache
 
-# Set working directory
-WORKDIR /app
+# Enable Apache rewrite
+RUN a2enmod rewrite
 
-# Copy project files
-COPY . /app
+# Copy all files to Apache web root
+COPY . /var/www/html/
 
-# Ensure logs directory exists (optional)
-RUN touch ussd_debug.log && chmod 666 ussd_debug.log
+# Set correct permissions
+RUN chown -R www-data:www-data /var/www/html
 
-# Expose the port that Render will set via $PORT
-EXPOSE 8080
+# Expose port (Render will handle routing)
+EXPOSE 80
 
-# Start PHP built-in server using the PORT Render provides
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} index.php"]
+# Start Apache in foreground
+CMD ["apache2-foreground"]
