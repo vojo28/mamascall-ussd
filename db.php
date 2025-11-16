@@ -1,10 +1,11 @@
 <?php
-$host = "localhost";        // From phpMyAdmin
-$username = "elevate_Mamascall";         // Your DB username
-$password = "Vu2ij^1pn76@"; // Your DB password
-$db_name = "elevate_Users";  // Your database name
+$host = "localhost";            // From phpMyAdmin
+$username = "elevate_Mamascall"; // Your DB username
+$password = "Vu2ij^1pn76@";     // Your DB password
+$db_name = "elevate_Users";      // Your database name
+
 try {
-    $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
+    $conn = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8", $username, $password);
     // Set error mode to exception
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     echo "✅ Database connected successfully";
