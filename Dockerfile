@@ -1,20 +1,27 @@
-# Use official PHP + Apache image
 FROM php:8.2-apache
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    unzip \
+    git \
+    curl
+
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 # Enable Apache rewrite
 RUN a2enmod rewrite
 
-# Install PDO MySQL extension
-RUN docker-php-ext-install pdo pdo_mysql
-
-# Copy all files to Apache web root
+# Copy project files
 COPY . /var/www/html/
 
-# Set correct permissions
+WORKDIR /var/www/html/
+
+# Install PHP dependencies
+RUN composer install --no-dev --prefer-dist
+
+# Permissions
 RUN chown -R www-data:www-data /var/www/html
 
-# Expose port (Render will handle routing)
 EXPOSE 80
-
-# Start Apache in foreground
 CMD ["apache2-foreground"]
