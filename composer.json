@@ -1,7 +1,9 @@
 {
   "require": {
     "php": ">=8.0",
+    "google/apiclient": "^2.0",
     "ext-pdo": "*",
     "ext-pdo_mysql": "*"
   }
 }
+
