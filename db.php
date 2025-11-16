@@ -3,10 +3,13 @@ $host = "localhost";        // From phpMyAdmin
 $username = "elevate_Mamascall";         // Your DB username
 $password = "Vu2ij^1pn76@"; // Your DB password
 $db_name = "elevate_Users";  // Your database name
-
-$conn = new mysqli($host, $username, $password, $db_name);
-
-if ($conn->connect_error) {
-    die("Database connection failed: " . $conn->connect_error);
+try {
+    $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
+    // Set error mode to exception
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    echo "✅ Database connected successfully";
+} catch(PDOException $e) {
+    echo "❌ Database connection failed: " . $e->getMessage();
+    exit;
 }
 ?>
