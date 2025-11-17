@@ -28,6 +28,7 @@ RUN composer install --no-dev --prefer-dist
 
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html
+RUN chmod 600 /var/www/html/credentials.json
 
 # Copy entrypoint and make executable
 COPY entrypoint.sh /entrypoint.sh
