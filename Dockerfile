@@ -29,14 +29,12 @@ RUN composer install --no-dev --prefer-dist
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html
 
-# Expose port (Render handles routing)
-EXPOSE 80
-
-CMD ["apache2-foreground"]
-
-# Copy entrypoint
+# Copy entrypoint and make executable
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-CMD ["/entrypoint.sh"]
+# Expose port
+EXPOSE 80
 
+# Use entrypoint to fix permissions and start Apache
+CMD ["/entrypoint.sh"]
