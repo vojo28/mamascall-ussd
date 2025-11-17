@@ -5,7 +5,7 @@ function getSheetService() {
     $client = new \Google_Client();
     $client->setApplicationName('Mama Call USSD');
     $client->setScopes([\Google_Service_Sheets::SPREADSHEETS]);
-   $client->setAuthConfig('/etc/secrets/credentials.json');
+   $client->setAuthConfig(__DIR__ . '/credentials.json');
     $service = new \Google_Service_Sheets($client);
     return $service;
 }
