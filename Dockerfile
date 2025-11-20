@@ -38,4 +38,5 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 80
 
 # Use entrypoint to fix permissions and start Apache
-CMD ["/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
+
