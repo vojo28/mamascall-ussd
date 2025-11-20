@@ -5,7 +5,8 @@ FROM php:8.2-apache
 RUN apt-get update && apt-get install -y \
     unzip \
     git \
-    curl
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Composer globally
 RUN curl -sS https://getcomposer.org/installer | php -- \
@@ -26,17 +27,11 @@ WORKDIR /var/www/html/
 # Install PHP dependencies (google/apiclient)
 RUN composer install --no-dev --prefer-dist
 
-# Fix permissions
+# Fix permissions for Apache
 RUN chown -R www-data:www-data /var/www/html
-
-
-# Copy entrypoint and make executable
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE 80
 
-# Use entrypoint to fix permissions and start Apache
-ENTRYPOINT ["/entrypoint.sh"]
-
+# Start Apache
+CMD ["apache2-foreground"]
