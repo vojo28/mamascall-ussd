@@ -1,11 +1,11 @@
 <?php
 require 'sheets.php';
 
-// Capture POST data
+// Get POST values safely
 $msisdn = $_POST['session_msisdn'] ?? '';
 $session_id = $_POST['session_id'] ?? '';
 $user_input = trim($_POST['session_msg'] ?? '');
-$input_history = explode('*', $user_input);
+$step = explode('*', $user_input);
 
 // Fetch existing session (check session_id in sheet)
 $service = getSheetService();
@@ -23,47 +23,41 @@ foreach ($rows as $r) {
     }
 }
 
-$input_history = $sessionExists ? array_merge(explode('*', $history), [$user_input]) : [$user_input];
+$input_history = $sessionExists ? explode('*', $history) : [];
+if ($user_input !== '') $input_history[] = $user_input;
 
-// Save or update session in sheet
+// Save or update session
 if ($sessionExists) {
-    updateRow($session_id, 8, implode('*', $input_history)); // user_input column
-    updateRow($session_id, 3, count($input_history));        // step column
+    updateRow($session_id, 8, implode('*', $input_history)); // user_input
+    updateRow($session_id, 3, count($input_history));        // step
 } else {
     appendRow([$session_id, $msisdn, '', '', '', '', '', '', implode('*', $input_history)]);
 }
 
 // Process USSD Flow
-$stepCount = count($input_history);
-$currentStep = $input_history[$stepCount - 1] ?? '';
-
-switch ($stepCount) {
+switch (count($input_history)) {
     case 1:
-        if ($currentStep == '1') {
+        if ($input_history[0] == '1') {
             echo "CON Please enter your full name:";
-        } elseif ($currentStep == '2') {
-            echo "END Mama’s Call is Nigeria’s first 24/7 maternal care hotline. Visit https://mamascall.org";
+        } elseif ($input_history[0] == '2') {
+            echo "END Mama’s Call is Nigeria’s first 24/7 maternal care hotline. We've got you, mama. Visit https://mamascall.org";
         } else {
             echo "END Invalid option. Try again.";
         }
         break;
 
     case 2:
-        $name = htmlspecialchars($currentStep);
+        $name = htmlspecialchars($input_history[1]);
         updateRow($session_id, 2, $name); // full_name
         echo "CON Select your status:\n1. Pregnant\n2. Nursing mother\n3. Father / Partner";
         break;
 
     case 3:
-        $status = $currentStep;
-        updateRow($session_id, 3, $status); // status column
-        if ($status == '1') {
-            echo "CON How many months pregnant are you?\n1. 1–3\n2. 4–6\n3. 7–9\n4. Not sure";
-        } elseif ($status == '2') {
-            echo "CON How old is your baby?\n1. 0–6 months\n2. 7–12 months\n3. 1–3 years\n4. Not sure";
-        } else {
-            echo "CON Select your state of residence:\n1. Lagos\n2. Abuja\n3. Oyo\n4. Others";
-        }
+        $status = $input_history[2];
+        updateRow($session_id, 3, $status); // status
+        if ($status == '1') echo "CON How many months pregnant are you?\n1. 1–3 months\n2. 4–6 months\n3. 7–9 months\n4. Not sure";
+        elseif ($status == '2') echo "CON How old is your baby?\n1. 0–6 months\n2. 7–12 months\n3. 1–3 years\n4. Not sure";
+        elseif ($status == '3') echo "CON Select your state of residence:\n1. Lagos\n2. Abuja\n3. Oyo\n4. Others";
         break;
 
     case 4:
@@ -90,6 +84,5 @@ switch ($stepCount) {
 
     default:
         echo "END Something went wrong. Please try again later.";
-        break;
 }
 ?>
