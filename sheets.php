@@ -1,58 +1,35 @@
 <?php
 require 'vendor/autoload.php';
 
-/**
- * Build Sheets API client using environment variables
- */
 function getSheetService() {
 
-    $clientEmail  = getenv('GOOGLE_CLIENT_EMAIL');
-    $privateKey   = getenv('GOOGLE_PRIVATE_KEY');
-    $projectId    = getenv('GOOGLE_PROJECT_ID');
+    // Read the entire JSON key from one environment variable
+    $json = getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
 
-    if (!$clientEmail || !$privateKey || !$projectId) {
-        throw new Exception("Missing Google environment variables.");
+    if (!$json) {
+        throw new Exception("GOOGLE_APPLICATION_CREDENTIALS_JSON not found.");
     }
 
-    // Fix escaped newlines
-    $privateKey = str_replace("\\n", "\n", $privateKey);
+    // Decode JSON
+    $credentials = json_decode($json, true);
 
-    // Build credentials JSON
-    $credentials = [
-        "type"                        => "service_account",
-        "project_id"                  => $projectId,
-        "private_key_id"              => "unused",
-        "private_key"                 => $privateKey,
-        "client_email"                => $clientEmail,
-        "client_id"                   => "unused",
-        "auth_uri"                    => "https://accounts.google.com/o/oauth2/auth",
-        "token_uri"                   => "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url" => "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url"        => ""
-    ];
+    if (!$credentials) {
+        throw new Exception("Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON.");
+    }
 
-    // Save into temporary file (works on Render)
-    $tempFile = sys_get_temp_dir() . '/google_creds.json';
-    file_put_contents($tempFile, json_encode($credentials));
-
+    // Create Google Client
     $client = new \Google_Client();
     $client->setApplicationName('Mama Call USSD');
     $client->setScopes([\Google_Service_Sheets::SPREADSHEETS]);
-    $client->setAuthConfig($tempFile);
+    $client->setAuthConfig($credentials);
 
     return new \Google_Service_Sheets($client);
 }
 
-/**
- * Spreadsheet ID
- */
 function getSheetId() {
     return '1XtSfnZTe6fecsFci1feq3M-0keSHUA9AThrCCHAvWII';
 }
 
-/**
- * Append a row and auto-insert header if sheet is empty
- */
 function appendRow($row) {
     $service = getSheetService();
     $spreadsheetId = getSheetId();
@@ -83,17 +60,14 @@ function appendRow($row) {
     );
 }
 
-/**
- * Update or append a row based on session_id
- */
 function updateRow($session_id, $column, $value) {
-
     $service = getSheetService();
     $spreadsheetId = getSheetId();
 
     $sheetData = $service->spreadsheets_values->get($spreadsheetId, 'Sessions!A2:I');
     $rows = $sheetData->getValues() ?? [];
 
+    // Find existing row
     $rowIndex = null;
     foreach ($rows as $i => $r) {
         if (($r[0] ?? '') === $session_id) {
@@ -102,33 +76,24 @@ function updateRow($session_id, $column, $value) {
         }
     }
 
-    $headers = [
-        0 => 'session_id',
-        1 => 'msisdn',
-        2 => 'full_name',
-        3 => 'status',
-        4 => 'months_pregnant',
-        5 => 'baby_age',
-        6 => 'state',
-        7 => 'consent',
-        8 => 'user_input'
+    $colIndexMap = [
+        'session_id','msisdn','full_name','status',
+        'months_pregnant','baby_age','state','consent','user_input'
     ];
 
-    if (!isset($headers[$column])) {
-        throw new Exception("Invalid column number: $column");
+    if (!isset($colIndexMap[$column])) {
+        throw new Exception("Invalid column index: $column");
     }
 
     if ($rowIndex !== null) {
         $range = "Sessions!" . chr(65 + $column) . $rowIndex;
         $body = new \Google_Service_Sheets_ValueRange(['values' => [[$value]]]);
-
         $service->spreadsheets_values->update(
             $spreadsheetId,
             $range,
             $body,
             ['valueInputOption' => 'USER_ENTERED']
         );
-
     } else {
         $newRow = array_fill(0, 9, '');
         $newRow[$column] = $value;
