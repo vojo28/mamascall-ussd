@@ -100,4 +100,48 @@ function updateRow($session_id, $column, $value) {
         appendRow($newRow);
     }
 }
+
+/**
+ * Log errors to the Errors sheet
+ */
+function logError($session_id, $msisdn, $step, $error_message) {
+    try {
+        $service = getSheetService();
+        $spreadsheetId = getSheetId();
+        
+        $timestamp = date('Y-m-d H:i:s');
+        $row = [$timestamp, $session_id, $msisdn, $step, $error_message];
+        
+        $body = new \Google_Service_Sheets_ValueRange(['values' => [$row]]);
+        $service->spreadsheets_values->append(
+            $spreadsheetId,
+            'Errors!A:E', // Tab name + range
+            $body,
+            ['valueInputOption' => 'USER_ENTERED']
+        );
+        
+        // Optional: send email alert
+        sendErrorEmail($row);
+        
+    } catch (\Exception $e) {
+        error_log("Failed to log error to sheet: " . $e->getMessage());
+    }
+}
+
+/**
+ * Send email alert when an error occurs
+ */
+function sendErrorEmail($row) {
+    $to = getenv('ADMIN_EMAIL'); // Set your admin email in environment variables
+    $subject = "USSD Service Error Alert";
+    $message = "An error occurred in USSD session:\n\n";
+    $message .= "Timestamp: " . $row[0] . "\n";
+    $message .= "Session ID: " . $row[1] . "\n";
+    $message .= "MSISDN: " . $row[2] . "\n";
+    $message .= "Step: " . $row[3] . "\n";
+    $message .= "Error: " . $row[4] . "\n";
+
+    @mail($to, $subject, $message);
+}
+
 ?>
