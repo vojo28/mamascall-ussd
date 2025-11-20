@@ -1,13 +1,23 @@
 <?php
 require 'vendor/autoload.php';
 
+// Get the Google Service Account credentials from environment variable
+$googleJson = getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON');
+if (!$googleJson) {
+    die("No credentials found in GOOGLE_APPLICATION_CREDENTIALS_JSON");
+}
+
 function getSheetService() {
+    global $googleJson;
+
     $client = new \Google_Client();
     $client->setApplicationName('Mama Call USSD');
     $client->setScopes([\Google_Service_Sheets::SPREADSHEETS]);
-    $client->setAuthConfig('/etc/secrets/credentials.json');
-    $service = new \Google_Service_Sheets($client);
-    return $service;
+
+    // Load credentials from environment variable JSON
+    $client->setAuthConfig(json_decode($googleJson, true));
+
+    return new \Google_Service_Sheets($client);
 }
 
 function getSheetId() {
@@ -41,7 +51,6 @@ function updateRow($session_id, $column, $value) {
     }
 
     if ($rowIndex !== null) {
-        $colIndex = ['session_id','msisdn','user_input','step','full_name','status','months_pregnant','baby_age','state','consent'][$column];
         $range = "Sheet1!" . chr(65 + $column) . $rowIndex;
         $body = new \Google_Service_Sheets_ValueRange(['values' => [[$value]]]);
         $service->spreadsheets_values->update($spreadsheetId, $range, $body, ['valueInputOption' => 'USER_ENTERED']);
