@@ -1,4 +1,17 @@
 <?php
+// Support both GET and POST
+$data = array_merge($_GET, $_POST);
+
+// Log raw request
+file_put_contents("ussd_debug.log", print_r($data, true), FILE_APPEND);
+
+// Extract variables
+$msisdn = $data['session_msisdn'] ?? '';
+$session_id = $data['session_id'] ?? '';
+$user_input = trim($data['session_msg'] ?? '');
+$session_operation = $data['session_operation'] ?? '';
+$step = explode('*', $user_input);
+
 require 'vendor/autoload.php';
 use Google\Client;
 use Google\Service\Sheets;
