@@ -1,4 +1,6 @@
 <?php
+require 'sheets.php';
+
 // Support both GET and POST
 $data = array_merge($_GET, $_POST);
 
@@ -10,140 +12,97 @@ $msisdn = $data['session_msisdn'] ?? '';
 $session_id = $data['session_id'] ?? '';
 $user_input = trim($data['session_msg'] ?? '');
 $session_operation = $data['session_operation'] ?? '';
-$step = explode('*', $user_input);
 
-require 'vendor/autoload.php';
-use Google\Client;
-use Google\Service\Sheets;
+// Split input history
+$input_history = $user_input === '' ? [] : explode('*', $user_input);
 
-function getSheetService() {
-    static $service = null;
+// Fetch existing session step from sheet if exists
+$step = count($input_history);
 
-    if ($service === null) {
-        $client = new Client();
-        $client->setApplicationName("Mama's Call USSD");
-        $client->setScopes([Sheets::SPREADSHEETS]);
-        
-        // Credentials pulled from environment
-        $credentialsJson = getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON');
-
-        if (!$credentialsJson) {
-            throw new Exception("Google credential JSON not found in environment variable.");
-        }
-
-        $client->setAuthConfig(json_decode($credentialsJson, true));
-        $service = new Sheets($client);
-    }
-
-    return $service;
-}
-
-function getSheetId() {
-    return getenv('GOOGLE_SHEET_ID'); // Ensure this is set in Render
-}
-
-/*  
-=========================================================
-  DATA STRUCTURE IN SHEET (Sessions Sheet)
-=========================================================
-A  Timestamp
-B  Session ID
-C  MSISDN
-D  Step Number
-E  Full Name
-F  Status
-G  Months Pregnant
-H  Baby Age
-I  State
-J  Consent
-K  Input History (1*2*3...)
-=========================================================
-*/
-
-/**
- * Appends a new row to the Sessions sheet
- */
-function appendRow($rowData) {
-    $service = getSheetService();
-    $sheetId = getSheetId();
-
-    $range = 'Sessions!A:K';
-    $body = new Sheets\ValueRange([
-        'values' => [$rowData]
-    ]);
-
-    $params = ['valueInputOption' => 'RAW'];
-
-    $service->spreadsheets_values->append(
-        $sheetId,
-        $range,
-        $body,
-        $params
-    );
-}
-
-/**
- * Updates a specific column in the row matching session_id.
- * 
- * @param $sessionId  session_id to find in column B
- * @param $columnIndex the column number (0 = A, 1 = B...)
- * @param $newValue the value to write
- */
-function updateRow($sessionId, $columnIndex, $newValue) {
-    $service = getSheetService();
-    $sheetId = getSheetId();
-
-    // Read entire Sessions sheet
-    $response = $service->spreadsheets_values->get($sheetId, 'Sessions!A2:K');
-    $rows = $response->getValues() ?? [];
-
-    foreach ($rows as $i => $row) {
-        if (isset($row[1]) && $row[1] == $sessionId) {
-            $sheetRowNumber = $i + 2;
-            $columnLetter = chr(65 + $columnIndex); // 0=A, 1=B ...
-
-            $range = "Sessions!{$columnLetter}{$sheetRowNumber}";
-            $body = new Sheets\ValueRange(['values' => [[$newValue]]]);
-
-            $service->spreadsheets_values->update(
-                $sheetId,
-                $range,
-                $body,
-                ['valueInputOption' => 'RAW']
-            );
-
-            return;
-        }
-    }
-
-    // If no row found → log automatically
-    logError($sessionId, '', 'Sheets', "Session not found while updating column $columnIndex");
-}
-
-/**
- * Log errors into the Errors sheet
- */
-function logError($sessionId, $msisdn, $module, $message) {
-    $service = getSheetService();
-    $sheetId = getSheetId();
-
+// Append/update session history in Sheets
+if ($session_operation === 'begin' && $step === 0) {
+    // New session
     $timestamp = date('Y-m-d H:i:s');
-
-    $body = new Sheets\ValueRange([
-        'values' => [[
-            $timestamp,
-            $sessionId,
-            $msisdn,
-            $module,
-            $message
-        ]]
+    appendRow([
+        $timestamp,
+        $session_id,
+        $msisdn,
+        0,   // step
+        '',  // full_name
+        '',  // status
+        '',  // months_pregnant
+        '',  // baby_age
+        '',  // state
+        '',  // consent
+        '',  // input history
     ]);
+} else {
+    updateRow($session_id, 10, $user_input); // column K = input history
+    updateRow($session_id, 3, $step);        // column D = step
+}
 
-    $service->spreadsheets_values->append(
-        $sheetId,
-        'Errors!A:E',
-        $body,
-        ['valueInputOption' => 'RAW']
-    );
+// -------------------- USSD FLOW -------------------- //
+switch ($step) {
+    case 0:
+        echo "CON Welcome to Mama’s Call ❤️\n1. Register\n2. Learn More";
+        break;
+
+    case 1:
+        if ($input_history[0] == '1') {
+            echo "CON Please enter your full name:";
+        } elseif ($input_history[0] == '2') {
+            echo "END Mama’s Call is Nigeria’s first 24/7 maternal care hotline. We've got you, mama.\nVisit https://mamascall.org";
+        } else {
+            echo "END Invalid option. Try again.";
+        }
+        break;
+
+    case 2:
+        $name = htmlspecialchars($input_history[1]);
+        updateRow($session_id, 4, $name); // column E = full_name
+        echo "CON Select your status:\n1. Pregnant\n2. Nursing mother\n3. Father / Partner";
+        break;
+
+    case 3:
+        $status = $input_history[2];
+        updateRow($session_id, 5, $status); // column F = status
+        if ($status == '1') {
+            echo "CON How many months pregnant are you?\n1. 1–3 months\n2. 4–6 months\n3. 7–9 months\n4. Not sure";
+        } elseif ($status == '2') {
+            echo "CON How old is your baby?\n1. 0–6 months\n2. 7–12 months\n3. 1–3 years\n4. Not sure";
+        } else {
+            echo "CON Select your state of residence:\n1. Lagos\n2. Abuja\n3. Oyo\n4. Others";
+        }
+        break;
+
+    case 4:
+        $status = $input_history[2];
+        $answer = $input_history[3];
+        if ($status == '1') {
+            updateRow($session_id, 6, $answer); // months_pregnant
+        } elseif ($status == '2') {
+            updateRow($session_id, 7, $answer); // baby_age
+        } else {
+            updateRow($session_id, 8, $answer); // state
+        }
+        echo "CON Select your state of residence:\n1. Lagos\n2. Abuja\n3. Oyo\n4. Others";
+        break;
+
+    case 5:
+        $state = $input_history[4];
+        updateRow($session_id, 8, $state); // column I = state
+        echo "CON Do you agree to receive helpful health messages from Mama’s Call?\n1. Yes\n2. No";
+        break;
+
+    case 6:
+        $consent = $input_history[5];
+        updateRow($session_id, 9, $consent); // column J = consent
+        echo "END Thank you ❤️\nYou’ve successfully joined Mama’s Call. We’ll reach out soon with helpful updates.";
+        break;
+
+    default:
+        echo "END Something went wrong. Please try again later.";
+        logError($session_id, $msisdn, 'USSD Flow', 'Invalid step count: ' . $step);
+        break;
 }
 ?>
