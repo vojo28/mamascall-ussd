@@ -44,7 +44,7 @@ switch(count($step)) {
         break;
 
     case 3:
-        $status = $step[2];
+        $status = $step[2] ?? '';
         if ($status == '1') $response = "CON How many months pregnant are you?\n1. 1–3 months\n2. 4–6 months\n3. 7–9 months\n4. Not sure";
         elseif ($status == '2') $response = "CON How old is your baby?\n1. 0–6 months\n2. 7–12 months\n3. 1–3 years\n4. Not sure";
         else $response = "CON Select your state of residence:\n1. Lagos\n2. Abuja\n3. Oyo\n4. Others";
@@ -73,7 +73,6 @@ register_shutdown_function(function() use ($msisdn, $session_id, $user_input) {
     try {
         $input_history = explode('*', $user_input);
 
-        // Fetch existing session
         $service = getSheetService();
         $sheetId = getSheetId();
         $sheetData = $service->spreadsheets_values->get($sheetId, 'Sessions!A2:K');
@@ -96,4 +95,23 @@ register_shutdown_function(function() use ($msisdn, $session_id, $user_input) {
             updateRow($session_id, 10, implode('*', $full_history));
             updateRow($session_id, 3, count($full_history));
         } else {
-            $timestamp = date('Y-m-d H
+            $timestamp = date('Y-m-d H:i:s');
+            appendRow([
+                $timestamp,
+                $session_id,
+                $msisdn,
+                count($full_history), // step
+                $input_history[1] ?? '', // full name
+                $input_history[2] ?? '', // status
+                $input_history[3] ?? '', // months pregnant
+                $input_history[3] ?? '', // baby age (reuse step if needed)
+                $input_history[4] ?? '', // state
+                $input_history[5] ?? '', // consent
+                implode('*', $full_history)
+            ]);
+        }
+    } catch (Exception $e) {
+        logError($session_id, $msisdn, 'USSD Flow', $e->getMessage());
+    }
+});
+?>
